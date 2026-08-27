@@ -59,6 +59,7 @@ from ..._auth.browser_capture import (
     connection_error_help,
     ensure_playwright_available,
     filter_storage_state_cookies_by_domain_policy,
+    find_installed_chromium,
     is_navigation_interrupted_error,
     recover_page,
     run_browser_capture,
@@ -222,7 +223,10 @@ def ensure_chromium_installed(io: LoginIO) -> None:
 
     Resolves Playwright's bundled-Chromium executable path in an isolated
     interpreter (:data:`CHROMIUM_PROBE_SOURCE`) and auto-installs when that
-    path is absent. Silently proceeds on any error — including an unreadable
+    path is absent — unless :func:`find_installed_chromium` finds a Chromium of
+    a *different* build revision under ``PLAYWRIGHT_BROWSERS_PATH``, in which
+    case the download is skipped and the launch reuses that build. Silently
+    proceeds on any error — including an unreadable
     probe answer — so Playwright handles it during launch. Both subprocess
     calls are timeout-bounded (30 s probe, 300 s install) so a network-stalled
     CLI cannot hang ``notebooklm login``; ``TimeoutExpired`` is a pre-flight
@@ -257,6 +261,17 @@ def ensure_chromium_installed(io: LoginIO) -> None:
                 )
             return
 
+        # A build is on disk, just not the revision this Playwright pins: launch
+        # against it rather than downloading a second copy. ``run_browser_capture``
+        # applies the same lookup as ``executable_path`` when it launches.
+        fallback = find_installed_chromium()
+        if fallback is not None:
+            io.emit(
+                "[dim]Playwright's pinned Chromium build is not installed; "
+                f"using {fallback} instead.[/dim]"
+            )
+            return
+
         io.emit("[yellow]Chromium browser not installed. Installing now...[/yellow]")
         install_result = subprocess.run(
             [sys.executable, "-m", "playwright", "install", "chromium"],
@@ -280,7 +295,11 @@ def ensure_chromium_installed(io: LoginIO) -> None:
             diagnostic_tail = sanitised_stderr or sanitised_stdout
             io.emit(
                 "[red]Failed to install Chromium browser.[/red]\n"
-                f'Run manually: "{sys.executable}" -m playwright install chromium'
+                f'Run manually: "{sys.executable}" -m playwright install chromium\n'
+                "If this network blocks the Playwright download CDN, skip it entirely:\n"
+                "  notebooklm login --browser chrome   (use installed Google Chrome)\n"
+                "  notebooklm login --browser msedge   (use installed Microsoft Edge)\n"
+                "  PLAYWRIGHT_BROWSERS_PATH=<dir>      (reuse a Chromium already on disk)"
             )
             if diagnostic_tail:
                 # markup=False: the captured CLI output is not Rich markup
@@ -530,6 +549,7 @@ __all__ = [
     "connection_error_help",
     "ensure_chromium_installed",
     "filter_storage_state_cookies_by_domain_policy",
+    "find_installed_chromium",
     "is_navigation_interrupted_error",
     "prepare_login_paths",
     "recover_page",

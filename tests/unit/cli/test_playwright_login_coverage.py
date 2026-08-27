@@ -290,6 +290,60 @@ def test_present_marker_skips_install(monkeypatch, capsys) -> None:
     assert capsys.readouterr().out == ""
 
 
+def test_installed_build_of_another_revision_skips_the_download(
+    monkeypatch, capsys, tmp_path
+) -> None:
+    """A Chromium already on disk is launched, not re-downloaded (#2253).
+
+    Playwright reports every revision but its own pinned one as "not installed",
+    so the probe says missing even where a perfectly usable build exists. On a
+    network that blocks the Playwright CDN the install then fails and login dies
+    with a browser one directory away.
+    """
+    fallback = tmp_path / "chromium-1194" / "chrome-linux" / "chrome"
+    fallback.parent.mkdir(parents=True)
+    fallback.write_text("#!/bin/sh\n")
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
+    calls = _record_subprocess(monkeypatch, CHROMIUM_MISSING_MARKER)
+
+    ensure_chromium_installed(make_login_io())
+
+    assert len(calls) == 1  # probe only, no install
+    out = capsys.readouterr().out
+    assert "Installing now" not in out
+    assert str(fallback) in out
+
+
+def test_missing_marker_with_no_installed_build_still_installs(monkeypatch, tmp_path) -> None:
+    """An empty browsers root is not a fallback — the download still runs."""
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
+    calls = _record_subprocess(monkeypatch, CHROMIUM_MISSING_MARKER)
+
+    ensure_chromium_installed(make_login_io())
+
+    assert calls[1] == [sys.executable, "-m", "playwright", "install", "chromium"]
+
+
+def test_install_failure_names_the_blocked_cdn_escape_hatches(monkeypatch) -> None:
+    """The failure has to be actionable offline: the CDN is not always reachable."""
+
+    def fake_run(cmd, **_):
+        if "install" in cmd:
+            return SimpleNamespace(stdout="", stderr="403 blocked", returncode=1)
+        return SimpleNamespace(stdout=CHROMIUM_MISSING_MARKER, stderr="", returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    io = _FakeLoginIO()
+
+    with pytest.raises(SystemExit):
+        ensure_chromium_installed(io)
+
+    message = "\n".join(str(args) for args, _ in io.emitted)
+    assert "--browser chrome" in message
+    assert "--browser msedge" in message
+    assert "PLAYWRIGHT_BROWSERS_PATH" in message
+
+
 def test_missing_marker_runs_the_install(monkeypatch, capsys) -> None:
     """A missing answer triggers ``playwright install chromium`` (the #2031 bug)."""
     calls = _record_subprocess(monkeypatch, f"{CHROMIUM_MISSING_MARKER}\n")

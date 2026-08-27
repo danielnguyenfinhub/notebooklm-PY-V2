@@ -456,6 +456,37 @@ class TestEnsureChromiumInstalled:
         )
 
     @pytest.mark.requires_playwright
+    def test_installed_build_of_another_revision_skips_the_install(
+        self, runner, monkeypatch, tmp_path
+    ):
+        """A Chromium of a different build revision is launched, not re-downloaded.
+
+        ``subprocess.run`` raises if the install is ever attempted, so this pins
+        the skip itself rather than only the rendered line.
+        """
+        fallback = tmp_path / "chromium-1194" / "chrome-linux" / "chrome"
+        fallback.parent.mkdir(parents=True)
+        fallback.write_text("#!/bin/sh\n")
+        monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
+
+        def fake_run(cmd, **_):
+            if "install" in cmd:
+                raise AssertionError("must not download a second Chromium")
+            return _probe_says_missing()
+
+        result, _ = _drive_login(runner, subprocess_run=fake_run, patch_ensure=False)
+        assert result.exit_code == 0
+        assert result.output == (
+            f"Playwright's pinned Chromium build is not installed; using {fallback} instead.\n"
+            f"Profile: {_PROFILE_NAME}\n"
+            "Opening Chromium for Google login...\n"
+            f"Using persistent profile: {_PROFILE}\n"
+            "Already logged in.\n"
+            "\n"
+            f"Authentication saved to: {_STORAGE}\n"
+        )
+
+    @pytest.mark.requires_playwright
     def test_install_failure_exits_with_markup_false_diagnostic(self, runner):
         """The install-failure path pins the ``markup=False`` site .
         The captured subprocess line ``install boom [err]`` keeps its literal
@@ -476,6 +507,10 @@ class TestEnsureChromiumInstalled:
             "Chromium browser not installed. Installing now...\n"
             "Failed to install Chromium browser.\n"
             'Run manually: "/py" -m playwright install chromium\n'
+            "If this network blocks the Playwright download CDN, skip it entirely:\n"
+            "  notebooklm login --browser chrome   (use installed Google Chrome)\n"
+            "  notebooklm login --browser msedge   (use installed Microsoft Edge)\n"
+            "  PLAYWRIGHT_BROWSERS_PATH=<dir>      (reuse a Chromium already on disk)\n"
             "[dim]Subprocess output (sanitised):[/dim]\n"
             "install boom [err]\n"
         )

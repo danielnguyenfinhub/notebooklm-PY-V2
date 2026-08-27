@@ -53,6 +53,7 @@ from . import psidts_recovery as _psidts_recovery
 # below because this module has always been its import site for the CLI adapter
 # (``cli/services/playwright_login.py``) and the launch banner.
 from .browser_launch_errors import CHANNEL_BROWSERS, classify_launch_failure
+from .chromium_discovery import browser_target_kwargs, find_installed_chromium
 
 # ``app_host_scope_note`` owns the both-personal-hosts cookie-scope caveat that
 # every "open the app in your browser" instruction needs (it is appended to the
@@ -673,10 +674,8 @@ def run_browser_capture(
                 "--password-store=basic",  # Avoid macOS keychain encryption for headless compatibility
             ],
             "ignore_default_args": ["--enable-automation"],
+            **browser_target_kwargs(p, browser=browser),
         }
-        if browser in CHANNEL_BROWSERS:
-            launch_kwargs["channel"] = browser
-
         context = None
         try:
             context = p.chromium.launch_persistent_context(**launch_kwargs)
@@ -1214,6 +1213,7 @@ __all__ = [
     "classify_launch_failure",
     "connection_error_help",
     "ensure_playwright_available",
+    "find_installed_chromium",
     "filter_storage_state_cookies_by_domain_policy",
     "is_navigation_interrupted_error",
     "recover_page",
