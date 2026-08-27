@@ -25,6 +25,21 @@ from notebooklm.types import (
 
 
 @pytest.fixture(autouse=True)
+def _clear_playwright_browsers_path(monkeypatch):
+    """Unset ``PLAYWRIGHT_BROWSERS_PATH`` for every CLI unit test.
+
+    The chromium pre-flight falls back to a Chromium of a different build
+    revision under that root instead of downloading one, so a host that exports
+    it (CI images and container sandboxes commonly do — this repo's own
+    development container ships ``/opt/pw-browsers``) would take the fallback
+    branch and skip the install these tests assert on. Clearing it pins the
+    default to "no shared browser root", and the fallback tests set it
+    explicitly to the tmp tree they built.
+    """
+    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _pin_cli_console_width():
     """Pin the shared Rich console to a wide, fixed width for every CLI unit test.
 

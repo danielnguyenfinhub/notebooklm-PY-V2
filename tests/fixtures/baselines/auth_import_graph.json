@@ -83,6 +83,11 @@
     {
       "scope": "module",
       "source": "browser_capture",
+      "target": "chromium_discovery"
+    },
+    {
+      "scope": "module",
+      "source": "browser_capture",
       "target": "cookie_policy"
     },
     {
@@ -124,6 +129,11 @@
       "scope": "module",
       "source": "browser_state_validation",
       "target": "browser_capture"
+    },
+    {
+      "scope": "module",
+      "source": "chromium_discovery",
+      "target": "browser_launch_errors"
     },
     {
       "scope": "module",
@@ -763,6 +773,11 @@
       "path": "src/notebooklm/_auth/browser_state_validation.py"
     },
     {
+      "lines": 121,
+      "name": "chromium_discovery",
+      "path": "src/notebooklm/_auth/chromium_discovery.py"
+    },
+    {
       "lines": 96,
       "name": "cookie_filter",
       "path": "src/notebooklm/_auth/cookie_filter.py"
@@ -924,10 +939,10 @@
   },
   "summary": {
     "function_local_edges": 12,
-    "module_edges": 130,
-    "modules": 41,
-    "total_lines": 16174,
-    "unique_edges": 142
+    "module_edges": 132,
+    "modules": 42,
+    "total_lines": 16295,
+    "unique_edges": 144
   },
   "version": 1
 }
